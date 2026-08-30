@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { OverviewView } from './components/views/OverviewView';
@@ -11,9 +12,11 @@ import { SettingsView } from './components/views/SettingsView';
 import { NewSkillModal } from './components/modals/NewSkillModal';
 import { CommandPalette } from './components/modals/CommandPalette';
 import { NewCategoryModal } from './components/modals/NewCategoryModal';
+import { KeyboardShortcutsModal } from './components/modals/KeyboardShortcutsModal';
 import { OnboardingWalkthrough } from './components/onboarding/OnboardingWalkthrough';
 import { NotificationPreferencesModal } from './components/notifications/NotificationPreferencesModal';
 import { NotificationToast } from './components/notifications/NotificationToast';
+import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
 import { SKILLS_DATA } from './data/skillsData';
 import { CATEGORY_LIST } from './data/categoriesData';
 import { DEFAULT_NOTIFICATIONS, DEFAULT_NOTIFICATION_PREFERENCES } from './data/notificationsData';
@@ -48,14 +51,65 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
   const [currentRole, setCurrentRole] = useState<UserRole>('ADMIN');
 
+  // Pinned Skills State with Local Storage persistence
+  const [pinnedSkillIds, setPinnedSkillIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('tsr_pinned_skill_ids');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    } catch (e) {
+      console.warn('Failed to parse pinned skill IDs from localStorage', e);
+    }
+    // Default initial pinned skills (24 Security Engineering, 01 Operating Rhythm, 08 AI Model Integration)
+    const defaults = SKILLS_DATA.filter((s) => ['24', '01', '08'].includes(s.number)).map((s) => s.id);
+    return defaults.length > 0 ? defaults : [SKILLS_DATA[0].id];
+  });
+
+  // Sync pinnedSkillIds to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('tsr_pinned_skill_ids', JSON.stringify(pinnedSkillIds));
+    } catch (e) {
+      console.warn('Failed to save pinned skills to localStorage', e);
+    }
+  }, [pinnedSkillIds]);
+
   // Modals & Flows
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
   const [isNewSkillModalOpen, setIsNewSkillModalOpen] = useState<boolean>(false);
   const [isNewCategoryModalOpen, setIsNewCategoryModalOpen] = useState<boolean>(false);
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState<boolean>(false);
   const [isNotificationPreferencesModalOpen, setIsNotificationPreferencesModalOpen] = useState<boolean>(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(() => {
     // Check if user has already seen the walkthrough
     return localStorage.getItem('tsr_onboarding_completed') !== 'true';
+  });
+
+  // Global Keyboard Shortcut Listener for Power Users (Ctrl+K, Ctrl+N, etc.)
+  useGlobalShortcuts({
+    onToggleCommandPalette: () => setIsCommandPaletteOpen((prev) => !prev),
+    onOpenNewSkill: () => setIsNewSkillModalOpen(true),
+    onOpenNewCategory: () => setIsNewCategoryModalOpen(true),
+    onOpenShortcutsHelp: () => setIsShortcutsHelpOpen((prev) => !prev),
+    onToggleDarkMode: () => setIsDarkMode((prev) => !prev),
+    onTriggerSync: () => handleManualSync(),
+    onExportCSV: () => exportSkillsToCSV(skills),
+    onSelectView: (view: string) => {
+      setActiveView(view);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    onCloseModals: () => {
+      setIsCommandPaletteOpen(false);
+      setIsNewSkillModalOpen(false);
+      setIsNewCategoryModalOpen(false);
+      setIsShortcutsHelpOpen(false);
+      setIsNotificationPreferencesModalOpen(false);
+      setIsOnboardingOpen(false);
+      setIsMobileSidebarOpen(false);
+    },
+    currentRole,
   });
 
   // Notifications State & Preferences
@@ -157,6 +211,35 @@ export default function App() {
 
   const handleClearAllNotifications = () => {
     setNotifications([]);
+  };
+
+  const handleSimulateNotification = () => {
+    const randomSkill = skills[Math.floor(Math.random() * skills.length)];
+    const events = [
+      {
+        type: 'test' as const,
+        title: 'Continuous Verification Passed',
+        message: `Automated test suite completed for Skill #${randomSkill.number} "${randomSkill.name}" with 100% pass rate.`,
+        skillNumber: randomSkill.number,
+        skillName: randomSkill.name,
+      },
+      {
+        type: 'certification' as const,
+        title: 'SOC2 Compliance Certification Verified',
+        message: `Security baseline for Skill #${randomSkill.number} verified against SOC2 Type II standard.`,
+        skillNumber: randomSkill.number,
+        skillName: randomSkill.name,
+      },
+      {
+        type: 'endorsement' as const,
+        title: 'Peer Architecture Endorsement',
+        message: `Principal Architect verified skill package contracts for "${randomSkill.name}".`,
+        skillNumber: randomSkill.number,
+        skillName: randomSkill.name,
+      },
+    ];
+    const picked = events[Math.floor(Math.random() * events.length)];
+    triggerNotification(picked);
   };
 
   // Category Management: create custom category
@@ -369,6 +452,50 @@ export default function App() {
     });
   };
 
+  // Pinned Skills Handler
+  const handleTogglePinSkill = (skillId: string) => {
+    const targetSkill = skills.find((s) => s.id === skillId);
+    const isCurrentlyPinned = pinnedSkillIds.includes(skillId);
+    const nextPinnedIds = isCurrentlyPinned
+      ? pinnedSkillIds.filter((id) => id !== skillId)
+      : [...pinnedSkillIds, skillId];
+
+    setPinnedSkillIds(nextPinnedIds);
+
+    // Update isPinned flag on skill items
+    setSkills((prev) =>
+      prev.map((s) =>
+        s.id === skillId ? { ...s, isPinned: !isCurrentlyPinned } : s
+      )
+    );
+
+    if (selectedSkill && selectedSkill.id === skillId) {
+      setSelectedSkill((prev) => (prev ? { ...prev, isPinned: !isCurrentlyPinned } : null));
+    }
+
+    if (targetSkill) {
+      if (!isCurrentlyPinned) {
+        triggerNotification({
+          type: 'endorsement',
+          title: 'Skill Pinned to Sidebar',
+          message: `Pinned #${targetSkill.number} "${targetSkill.name}" for instant quick access.`,
+          skillNumber: targetSkill.number,
+          skillName: targetSkill.name,
+        });
+      } else {
+        triggerNotification({
+          type: 'system',
+          title: 'Skill Unpinned',
+          message: `Removed #${targetSkill.number} "${targetSkill.name}" from your pinned shortcuts.`,
+          skillNumber: targetSkill.number,
+          skillName: targetSkill.name,
+        });
+      }
+    }
+  };
+
+  const pinnedSkills = skills.filter((s) => pinnedSkillIds.includes(s.id));
+
   // Filter skills according to search and category
   const filteredSkills = skills.filter((s) => {
     const matchesCat =
@@ -393,23 +520,30 @@ export default function App() {
         syncState={syncState}
         onTriggerSync={handleManualSync}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onExport={handleExport}
-        notifications={notifications}
-        onMarkAsRead={handleMarkNotificationAsRead}
-        onMarkAllAsRead={handleMarkAllNotificationsAsRead}
-        onClearAll={handleClearAllNotifications}
-        onOpenNotificationPreferences={() => setIsNotificationPreferencesModalOpen(true)}
-        onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        onOpenNewSkillModal={() => setIsNewSkillModalOpen(true)}
         onOpenNewCategoryModal={() => setIsNewCategoryModalOpen(true)}
+        onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+        activeView={activeView}
+        onSelectView={setActiveView}
+        notifications={notifications}
+        onMarkNotificationAsRead={handleMarkNotificationAsRead}
+        onMarkAllNotificationsAsRead={handleMarkAllNotificationsAsRead}
+        onClearAllNotifications={handleClearAllNotifications}
+        onOpenNotificationPreferences={() => setIsNotificationPreferencesModalOpen(true)}
+        onSimulateNotificationEvent={handleSimulateNotification}
+        onToggleMobileSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)}
+        isMobileSidebarOpen={isMobileSidebarOpen}
       />
 
       {/* Body Layout: Sidebar + Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
+      <div className="flex-1 flex overflow-hidden relative">
+        {/* Left Sidebar (Desktop Static + Mobile Collapsible Off-Canvas Drawer) */}
         <Sidebar
           activeView={activeView}
           onSelectView={(view) => {
             setActiveView(view);
+            setIsMobileSidebarOpen(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
           skillsCount={skills.length}
@@ -417,87 +551,115 @@ export default function App() {
           filesCount={610}
           testsCount={70}
           currentRole={currentRole}
-          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+          pinnedSkills={pinnedSkills}
+          onSelectPinnedSkill={(skill) => {
+            setSelectedSkill(skill);
+            setActiveView('overview');
+            setIsMobileSidebarOpen(false);
+          }}
+          onTogglePinSkill={handleTogglePinSkill}
+          selectedSkillId={selectedSkill?.id}
+          onOpenOnboarding={() => {
+            setIsOnboardingOpen(true);
+            setIsMobileSidebarOpen(false);
+          }}
+          isMobileOpen={isMobileSidebarOpen}
+          onCloseMobile={() => setIsMobileSidebarOpen(false)}
         />
 
         {/* Center Main Scrollable Canvas */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto w-full">
-          {activeView === 'overview' && (
-            <OverviewView
-              skills={filteredSkills}
-              selectedSkill={selectedSkill}
-              onSelectSkill={(skill) => setSelectedSkill(skill)}
-              activeCategoryFilter={activeCategoryFilter}
-              onSelectCategoryFilter={setActiveCategoryFilter}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              currentRole={currentRole}
-              onSelectView={setActiveView}
-              onUpdateSkillTags={handleUpdateSkillTags}
-              onEndorseSkill={handleEndorseSkill}
-            />
-          )}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeView}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="w-full"
+            >
+              {activeView === 'overview' && (
+                <OverviewView
+                  skills={filteredSkills}
+                  selectedSkill={selectedSkill}
+                  onSelectSkill={(skill) => setSelectedSkill(skill)}
+                  activeCategoryFilter={activeCategoryFilter}
+                  onSelectCategoryFilter={setActiveCategoryFilter}
+                  searchQuery={searchQuery}
+                  onSearchChange={setSearchQuery}
+                  currentRole={currentRole}
+                  onSelectView={setActiveView}
+                  onUpdateSkillTags={handleUpdateSkillTags}
+                  onEndorseSkill={handleEndorseSkill}
+                  onTogglePinSkill={handleTogglePinSkill}
+                  pinnedSkillIds={pinnedSkillIds}
+                />
+              )}
 
-          {activeView === 'skills' && (
-            <SkillsView
-              skills={skills}
-              currentRole={currentRole}
-              onOpenNewSkillModal={() => setIsNewSkillModalOpen(true)}
-              onSelectSkill={(skill) => setSelectedSkill(skill)}
-              selectedSkill={selectedSkill}
-              categories={categories}
-              onUpdateSkill={handleUpdateSkill}
-              onUpdateSkillTags={handleUpdateSkillTags}
-              onEndorseSkill={handleEndorseSkill}
-              onBatchTagSkills={handleBatchTagSkills}
-              onBatchMoveCategory={handleBatchMoveCategory}
-              onBatchArchiveSkills={handleBatchArchiveSkills}
-              onBatchDeleteSkills={handleBatchDeleteSkills}
-              onBatchStatusSkills={handleBatchStatusSkills}
-              onBatchVerifySkills={handleBatchVerifySkills}
-            />
-          )}
+              {activeView === 'skills' && (
+                <SkillsView
+                  skills={skills}
+                  currentRole={currentRole}
+                  onOpenNewSkillModal={() => setIsNewSkillModalOpen(true)}
+                  onSelectSkill={(skill) => setSelectedSkill(skill)}
+                  selectedSkill={selectedSkill}
+                  categories={categories}
+                  onUpdateSkill={handleUpdateSkill}
+                  onUpdateSkillTags={handleUpdateSkillTags}
+                  onEndorseSkill={handleEndorseSkill}
+                  onBatchTagSkills={handleBatchTagSkills}
+                  onBatchMoveCategory={handleBatchMoveCategory}
+                  onBatchArchiveSkills={handleBatchArchiveSkills}
+                  onBatchDeleteSkills={handleBatchDeleteSkills}
+                  onBatchStatusSkills={handleBatchStatusSkills}
+                  onBatchVerifySkills={handleBatchVerifySkills}
+                  onTogglePinSkill={handleTogglePinSkill}
+                  pinnedSkillIds={pinnedSkillIds}
+                />
+              )}
 
-          {activeView === 'categories' && (
-            <CategoriesView
-              categories={categories}
-              skills={skills}
-              onSelectSkill={(skill) => {
-                setSelectedSkill(skill);
-                setActiveView('overview');
-              }}
-              onOpenNewCategoryModal={() => setIsNewCategoryModalOpen(true)}
-            />
-          )}
+              {activeView === 'categories' && (
+                <CategoriesView
+                  categories={categories}
+                  skills={skills}
+                  onSelectSkill={(skill) => {
+                    setSelectedSkill(skill);
+                    setActiveView('overview');
+                  }}
+                  onOpenNewCategoryModal={() => setIsNewCategoryModalOpen(true)}
+                />
+              )}
 
-          {activeView === 'files' && <FileTreeView />}
+              {activeView === 'files' && <FileTreeView />}
 
-          {activeView === 'tests' && <TestsView currentRole={currentRole} />}
+              {activeView === 'tests' && <TestsView currentRole={currentRole} />}
 
-          {activeView === 'insights' && (
-            <InsightsView
-              skills={skills}
-              categories={categories}
-              selectedSkillId={selectedSkill?.id}
-              onSelectSkill={(skill) => {
-                setSelectedSkill(skill);
-                setActiveView('overview');
-              }}
-            />
-          )}
+              {activeView === 'insights' && (
+                <InsightsView
+                  skills={skills}
+                  categories={categories}
+                  selectedSkillId={selectedSkill?.id}
+                  onSelectSkill={(skill) => {
+                    setSelectedSkill(skill);
+                    setActiveView('overview');
+                  }}
+                />
+              )}
 
-          {activeView === 'settings' && (
-            <SettingsView
-              currentRole={currentRole}
-              onChangeRole={setCurrentRole}
-              syncState={syncState}
-              onTriggerSync={handleManualSync}
-              notificationPreferences={notificationPreferences}
-              onUpdateNotificationPreferences={setNotificationPreferences}
-              onOpenNotificationPreferences={() => setIsNotificationPreferencesModalOpen(true)}
-              onOpenOnboarding={() => setIsOnboardingOpen(true)}
-            />
-          )}
+              {activeView === 'settings' && (
+                <SettingsView
+                  currentRole={currentRole}
+                  onChangeRole={setCurrentRole}
+                  syncState={syncState}
+                  onTriggerSync={handleManualSync}
+                  notificationPreferences={notificationPreferences}
+                  onUpdateNotificationPreferences={setNotificationPreferences}
+                  onOpenNotificationPreferences={() => setIsNotificationPreferencesModalOpen(true)}
+                  onOpenOnboarding={() => setIsOnboardingOpen(true)}
+                />
+              )}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
@@ -510,6 +672,32 @@ export default function App() {
           setActiveView('overview');
         }}
         onSelectView={(view) => setActiveView(view)}
+        onOpenNewSkill={() => setIsNewSkillModalOpen(true)}
+        onOpenNewCategory={() => setIsNewCategoryModalOpen(true)}
+        onOpenShortcutsHelp={() => setIsShortcutsHelpOpen(true)}
+        skills={skills}
+        pinnedSkillIds={pinnedSkillIds}
+        onTogglePinSkill={handleTogglePinSkill}
+      />
+
+      <KeyboardShortcutsModal
+        isOpen={isShortcutsHelpOpen}
+        onClose={() => setIsShortcutsHelpOpen(false)}
+        onSelectAction={(actionId) => {
+          if (actionId === 'cmd-palette') setIsCommandPaletteOpen(true);
+          else if (actionId === 'new-skill') setIsNewSkillModalOpen(true);
+          else if (actionId === 'new-category') setIsNewCategoryModalOpen(true);
+          else if (actionId === 'nav-overview') setActiveView('overview');
+          else if (actionId === 'nav-skills') setActiveView('skills');
+          else if (actionId === 'nav-categories') setActiveView('categories');
+          else if (actionId === 'nav-files') setActiveView('files');
+          else if (actionId === 'nav-tests') setActiveView('tests');
+          else if (actionId === 'nav-insights') setActiveView('insights');
+          else if (actionId === 'nav-settings') setActiveView('settings');
+          else if (actionId === 'action-theme') setIsDarkMode((prev) => !prev);
+          else if (actionId === 'action-sync') handleManualSync();
+          else if (actionId === 'action-export') exportSkillsToCSV(skills);
+        }}
       />
 
       <NewSkillModal
@@ -552,23 +740,32 @@ export default function App() {
 
       {/* Real-Time Notification Toasts Stack */}
       <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm w-full pointer-events-none">
-        {activeToasts.map((toast) => (
-          <div key={toast.id} className="pointer-events-auto">
-            <NotificationToast
-              notification={toast}
-              onDismiss={handleDismissToast}
-              onAction={(notif) => {
-                if (notif.skillNumber) {
-                  const target = skills.find((s) => s.number === notif.skillNumber);
-                  if (target) {
-                    setSelectedSkill(target);
-                    setActiveView('overview');
+        <AnimatePresence>
+          {activeToasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 15, scale: 0.9, transition: { duration: 0.15 } }}
+              layout
+              className="pointer-events-auto"
+            >
+              <NotificationToast
+                notification={toast}
+                onDismiss={handleDismissToast}
+                onAction={(notif) => {
+                  if (notif.skillNumber) {
+                    const target = skills.find((s) => s.number === notif.skillNumber);
+                    if (target) {
+                      setSelectedSkill(target);
+                      setActiveView('overview');
+                    }
                   }
-                }
-              }}
-            />
-          </div>
-        ))}
+                }}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </div>
   );

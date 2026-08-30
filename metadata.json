@@ -1,6 +1,6 @@
 {
   "name": "Technical Skills Registry",
   "description": "Enterprise SaaS Skills Registry Dashboard with real-time analytics, D3.js topology graphs, role-based access control, notification system, onboarding walkthrough, custom category and tagging management, dark mode, and report exports.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

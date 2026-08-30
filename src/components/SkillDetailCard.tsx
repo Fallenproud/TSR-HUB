@@ -25,6 +25,7 @@ import {
   AlertCircle,
   HelpCircle,
   ExternalLink,
+  Star,
 } from 'lucide-react';
 import { SkillItem, UserRole } from '../types';
 import { CATEGORIES_DATA } from '../data/categoriesData';
@@ -38,6 +39,8 @@ interface SkillDetailCardProps {
   onRunTestForSkill?: (skill: SkillItem) => void;
   onUpdateTags?: (skillId: string, tags: string[]) => void;
   onEndorseSkill?: (skill: SkillItem) => void;
+  onTogglePinSkill?: (skillId: string) => void;
+  isPinned?: boolean;
 }
 
 export const SkillDetailCard: React.FC<SkillDetailCardProps> = ({
@@ -48,6 +51,8 @@ export const SkillDetailCard: React.FC<SkillDetailCardProps> = ({
   onRunTestForSkill,
   onUpdateTags,
   onEndorseSkill,
+  onTogglePinSkill,
+  isPinned = false,
 }) => {
   const [activeTab, setActiveTab] = useState<
     | 'overview'
@@ -198,6 +203,30 @@ export const SkillDetailCard: React.FC<SkillDetailCardProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {onTogglePinSkill && (
+            <button
+              id={`btn-pin-skill-${skill.id}`}
+              onClick={() => onTogglePinSkill(skill.id)}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all border shadow-2xs ${
+                (isPinned || skill.isPinned)
+                  ? 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:bg-amber-50/60 dark:hover:bg-amber-950/30 hover:text-amber-700 dark:hover:text-amber-300 hover:border-amber-200'
+              }`}
+              title={(isPinned || skill.isPinned) ? 'Unpin from sidebar' : 'Pin to sidebar'}
+            >
+              <Star
+                className={`w-3.5 h-3.5 ${
+                  (isPinned || skill.isPinned)
+                    ? 'text-amber-500 fill-amber-500'
+                    : 'text-slate-400 group-hover:text-amber-500'
+                }`}
+              />
+              <span className="hidden sm:inline">
+                {(isPinned || skill.isPinned) ? 'Pinned' : 'Pin'}
+              </span>
+            </button>
+          )}
+
           {onClose && (
             <button
               id={`btn-close-skill-${skill.id}`}

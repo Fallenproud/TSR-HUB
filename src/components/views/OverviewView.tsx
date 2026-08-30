@@ -18,6 +18,8 @@ interface OverviewViewProps {
   onSelectView: (view: string) => void;
   onUpdateSkillTags?: (skillId: string, tags: string[]) => void;
   onEndorseSkill?: (skill: SkillItem) => void;
+  onTogglePinSkill?: (skillId: string) => void;
+  pinnedSkillIds?: string[];
 }
 
 export const OverviewView: React.FC<OverviewViewProps> = ({
@@ -32,6 +34,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
   onSelectView,
   onUpdateSkillTags,
   onEndorseSkill,
+  onTogglePinSkill,
+  pinnedSkillIds = [],
 }) => {
   return (
     <div className="space-y-6">
@@ -74,6 +78,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
                 }}
                 onUpdateTags={onUpdateSkillTags}
                 onEndorseSkill={onEndorseSkill}
+                onTogglePinSkill={onTogglePinSkill}
+                isPinned={pinnedSkillIds.includes(selectedSkill.id) || selectedSkill.isPinned}
               />
             </div>
           )}
@@ -87,6 +93,8 @@ export const OverviewView: React.FC<OverviewViewProps> = ({
             onSelectCategoryFilter={onSelectCategoryFilter}
             searchQuery={searchQuery}
             onSearchChange={onSearchChange}
+            onTogglePinSkill={onTogglePinSkill}
+            pinnedSkillIds={pinnedSkillIds}
           />
         </div>
 

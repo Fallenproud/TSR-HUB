@@ -105,6 +105,31 @@ export const D3TopologyGraph: React.FC<D3TopologyGraphProps> = ({
   const [linkDistance, setLinkDistance] = useState(85);
   const [collisionRadius, setCollisionRadius] = useState(30);
 
+  // Responsive Container Dimensions
+  const [containerDimensions, setContainerDimensions] = useState<{ width: number; height: number }>({
+    width: 900,
+    height: 580,
+  });
+
+  // ResizeObserver for Container Sizing
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          const w = entry.contentRect.width;
+          const isMobile = w < 640;
+          const h = isFullscreen ? window.innerHeight - 180 : isMobile ? 420 : 580;
+          setContainerDimensions({ width: w, height: h });
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [isFullscreen]);
+
   // Selection & Highlight state
   const [hoveredNode, setHoveredNode] = useState<D3TopologyNode | null>(null);
   const [pinnedNode, setPinnedNode] = useState<D3TopologyNode | null>(null);
@@ -304,8 +329,7 @@ export const D3TopologyGraph: React.FC<D3TopologyGraphProps> = ({
   useEffect(() => {
     if (!containerRef.current || !svgRef.current) return;
 
-    const width = containerRef.current.clientWidth || 900;
-    const height = isFullscreen ? window.innerHeight - 180 : 580;
+    const { width, height } = containerDimensions;
     const centerX = width / 2;
     const centerY = height / 2;
 
@@ -315,7 +339,8 @@ export const D3TopologyGraph: React.FC<D3TopologyGraphProps> = ({
     svg
       .attr('width', '100%')
       .attr('height', height)
-      .attr('viewBox', `0 0 ${width} ${height}`);
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     const defs = svg.append('defs');
 
@@ -679,6 +704,7 @@ export const D3TopologyGraph: React.FC<D3TopologyGraphProps> = ({
     showNodeLabels,
     isFullscreen,
     selectedSkillId,
+    containerDimensions,
   ]);
 
   // Highlighting & Focus logic
@@ -1014,7 +1040,7 @@ export const D3TopologyGraph: React.FC<D3TopologyGraphProps> = ({
       <div
         ref={containerRef}
         className={`relative w-full overflow-hidden select-none bg-slate-900/5 dark:bg-slate-950/70 ${
-          isFullscreen ? 'flex-1 min-h-[600px]' : 'h-[580px]'
+          isFullscreen ? 'flex-1 min-h-[600px]' : 'h-[420px] sm:h-[500px] md:h-[580px]'
         }`}
       >
         <svg ref={svgRef} className="w-full h-full block cursor-grab active:cursor-grabbing" />

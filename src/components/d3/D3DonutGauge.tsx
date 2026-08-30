@@ -27,8 +27,26 @@ export const D3DonutGauge: React.FC<D3DonutGaugeProps> = ({
   centerLabel = '100%',
   centerSublabel = 'Complete',
 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [activeSegment, setActiveSegment] = useState<DonutSegment | null>(null);
+  const [gaugeSize, setGaugeSize] = useState<number>(size);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          const newSize = Math.min(entry.contentRect.width, size);
+          setGaugeSize(Math.max(100, newSize));
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [size]);
 
   const total = segments.reduce((acc, s) => acc + s.value, 0) || 1;
 
@@ -38,17 +56,24 @@ export const D3DonutGauge: React.FC<D3DonutGaugeProps> = ({
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const width = size;
-    const height = size;
+    const currentSize = gaugeSize;
+    const width = currentSize;
+    const height = currentSize;
     const radius = Math.min(width, height) / 2;
     const innerRadius = radius * 0.72;
+
+    svg
+      .attr('width', currentSize)
+      .attr('height', currentSize)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     const g = svg
       .append('g')
       .attr('transform', `translate(${width / 2},${height / 2})`);
 
     // If all other segments are 0, draw full ring for complete
-    const pieData = segments.filter(s => s.value > 0);
+    const pieData = segments.filter((s) => s.value > 0);
     const validData = pieData.length > 0 ? pieData : [{ label: 'Complete', value: 1, color: '#10b981' }];
 
     const pie = d3
@@ -89,34 +114,38 @@ export const D3DonutGauge: React.FC<D3DonutGaugeProps> = ({
         d3.select(this)
           .transition()
           .duration(150)
-          .attr('d', (arcHover(d) || ''));
+          .attr('d', arcHover(d) || '');
         setActiveSegment(d.data);
       })
       .on('mouseleave', function (event, d) {
         d3.select(this)
           .transition()
           .duration(150)
-          .attr('d', (arc(d) || ''));
+          .attr('d', arc(d) || '');
         setActiveSegment(null);
       });
-  }, [size, segments]);
+
+    // Center text label
+    const textGroup = g.append('g').attr('text-anchor', 'middle');
+
+    textGroup
+      .append('text')
+      .attr('dy', '-0.1em')
+      .attr('class', 'fill-slate-900 dark:fill-white font-bold font-mono')
+      .attr('font-size', `${Math.max(13, radius * 0.32)}px`)
+      .text(activeSegment ? `${activeSegment.value}` : centerLabel);
+
+    textGroup
+      .append('text')
+      .attr('dy', '1.3em')
+      .attr('class', 'fill-slate-400 font-medium')
+      .attr('font-size', `${Math.max(9, radius * 0.18)}px`)
+      .text(activeSegment ? activeSegment.label : centerSublabel);
+  }, [gaugeSize, segments, centerLabel, centerSublabel, activeSegment]);
 
   return (
-    <div className="relative inline-flex items-center justify-center">
-      <svg
-        ref={svgRef}
-        width={size}
-        height={size}
-        className="overflow-visible"
-      />
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-        <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white leading-none">
-          {activeSegment ? `${Math.round((activeSegment.value / total) * 100)}%` : centerLabel}
-        </span>
-        <span className="text-[11px] font-medium text-slate-500 dark:text-slate-400 mt-0.5">
-          {activeSegment ? activeSegment.label : centerSublabel}
-        </span>
-      </div>
+    <div ref={containerRef} className="flex flex-col items-center justify-center p-1 overflow-hidden w-full">
+      <svg ref={svgRef} className="overflow-visible max-w-full h-auto" />
     </div>
   );
 };

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { X, Sparkles, Plus, Trash2, CheckCircle2, Tag } from 'lucide-react';
+import { X, Sparkles, Plus, Trash2, CheckCircle2, Tag, Mic } from 'lucide-react';
 import { SkillItem, CategoryId, CategoryInfo } from '../../types';
 import { CATEGORY_LIST } from '../../data/categoriesData';
 import { ALL_PRESET_TAGS } from '../../data/skillsData';
+import { VoiceInputButton } from '../common/VoiceInputButton';
 
 interface NewSkillModalProps {
   isOpen: boolean;
@@ -117,11 +118,32 @@ export const NewSkillModal: React.FC<NewSkillModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* Voice Dictation Helper Banner */}
+          <div className="p-3 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/60 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
+              <Mic className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+              <span>
+                <strong>Voice Dictation Active:</strong> Click any microphone icon to dictate fields using speech-to-text.
+              </span>
+            </div>
+            <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono hidden sm:inline-block">
+              Web Speech API
+            </span>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Skill Name *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Skill Name *
+                </label>
+                <VoiceInputButton
+                  size="sm"
+                  mode="replace"
+                  title="Dictate skill name"
+                  onTranscript={(spoken) => setName(spoken)}
+                />
+              </div>
               <input
                 type="text"
                 required
@@ -151,27 +173,45 @@ export const NewSkillModal: React.FC<NewSkillModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Short Description
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Short Description
+              </label>
+              <VoiceInputButton
+                size="sm"
+                mode="replace"
+                title="Dictate short description"
+                onTranscript={(spoken) => setDescription(spoken)}
+              />
+            </div>
             <input
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief 1-sentence summary of the skill's capability"
+              placeholder="Brief 1-sentence summary of the skill's capability (or click mic to speak)"
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Detailed Purpose Statement
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Detailed Purpose Statement
+              </label>
+              <VoiceInputButton
+                size="sm"
+                mode="append"
+                title="Dictate detailed purpose (appends as you speak)"
+                onTranscript={(spoken) =>
+                  setPurpose((prev) => (prev ? `${prev} ${spoken}` : spoken))
+                }
+              />
+            </div>
             <textarea
-              rows={2}
+              rows={3}
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
-              placeholder="Explain the architectural outcomes and standard requirements..."
+              placeholder="Explain the architectural outcomes, constraints, and standard requirements (dictate continuously with mic)..."
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
           </div>
@@ -208,10 +248,21 @@ export const NewSkillModal: React.FC<NewSkillModalProps> = ({
 
           {/* Tag Selector */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Skill Domain Tags</span>
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Skill Domain Tags</span>
+              </label>
+              <VoiceInputButton
+                size="sm"
+                mode="replace"
+                title="Dictate domain tag (e.g. 'cloud native')"
+                onTranscript={(spoken) => {
+                  const cleaned = spoken.replace(/#/g, '').trim().toLowerCase().replace(/\s+/g, '-');
+                  if (cleaned) handleAddTag(cleaned);
+                }}
+              />
+            </div>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -223,7 +274,7 @@ export const NewSkillModal: React.FC<NewSkillModalProps> = ({
                     handleAddTag(customTagInput);
                   }
                 }}
-                placeholder="Type custom tag (e.g. #cloud-native) and press enter..."
+                placeholder="Type or dictate custom tag (e.g. #cloud-native)..."
                 className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white font-mono"
               />
               <button
@@ -274,9 +325,21 @@ export const NewSkillModal: React.FC<NewSkillModalProps> = ({
 
           {/* Required Inputs Tag Manager */}
           <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Required Inputs
-            </label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                Required Inputs
+              </label>
+              <VoiceInputButton
+                size="sm"
+                mode="replace"
+                title="Dictate required input artifact"
+                onTranscript={(spoken) => {
+                  if (spoken.trim() && !inputs.includes(spoken.trim())) {
+                    setInputs((prev) => [...prev, spoken.trim()]);
+                  }
+                }}
+              />
+            </div>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -288,7 +351,7 @@ export const NewSkillModal: React.FC<NewSkillModalProps> = ({
                     handleAddInput();
                   }
                 }}
-                placeholder="Add input requirement (press enter)..."
+                placeholder="Add input requirement (press enter or click mic)..."
                 className="flex-1 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white"
               />
               <button

@@ -14,9 +14,26 @@ export const D3Sparkline: React.FC<D3SparklineProps> = ({
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [data, setData] = useState<number[]>([
-    45, 52, 49, 62, 58, 70, 65, 55, 68, 72, 60, 64, 75, 71, 69, 78, 74, 82, 79, 85
+    45, 52, 49, 62, 58, 70, 65, 55, 68, 72, 60, 64, 75, 71, 69, 78, 74, 82, 79, 85,
   ]);
   const [hoverVal, setHoverVal] = useState<number | null>(null);
+  const [sparkWidth, setSparkWidth] = useState<number>(240);
+
+  // Resize observer for responsive parent container scaling
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setSparkWidth(entry.contentRect.width);
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Live real-time data point generation
   useEffect(() => {
@@ -36,7 +53,7 @@ export const D3Sparkline: React.FC<D3SparklineProps> = ({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const width = containerRef.current.clientWidth || 240;
+    const width = sparkWidth;
     const svg = d3.select(containerRef.current).select('svg');
     svg.selectAll('*').remove();
 
@@ -47,8 +64,8 @@ export const D3Sparkline: React.FC<D3SparklineProps> = ({
       .attr('preserveAspectRatio', 'none');
 
     const margin = { top: 6, right: 6, bottom: 6, left: 6 };
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const innerWidth = Math.max(20, width - margin.left - margin.right);
+    const innerHeight = Math.max(10, height - margin.top - margin.bottom);
 
     const g = svg
       .append('g')
@@ -102,63 +119,70 @@ export const D3Sparkline: React.FC<D3SparklineProps> = ({
       .y((d) => yScale(d))
       .curve(d3.curveMonotoneX);
 
-    // Render Area
+    // Draw area fill
     g.append('path')
       .datum(data)
-      .attr('fill', `url(#${gradientId})`)
-      .attr('d', area);
+      .attr('d', area)
+      .attr('fill', `url(#${gradientId})`);
 
-    // Render Line
+    // Draw main stroke line
     g.append('path')
       .datum(data)
+      .attr('d', line)
       .attr('fill', 'none')
       .attr('stroke', color)
       .attr('stroke-width', 2)
-      .attr('stroke-linecap', 'round')
-      .attr('stroke-linejoin', 'round')
-      .attr('d', line);
+      .attr('stroke-linecap', 'round');
 
-    // Last point pulsing dot
+    // Pulsing end marker
     const lastX = xScale(data.length - 1);
     const lastY = yScale(data[data.length - 1]);
 
     g.append('circle')
       .attr('cx', lastX)
       .attr('cy', lastY)
-      .attr('r', 3.5)
+      .attr('r', 4)
       .attr('fill', color)
-      .attr('stroke', '#ffffff')
-      .attr('stroke-width', 1.5);
+      .attr('class', 'animate-ping origin-center')
+      .attr('opacity', 0.75);
 
-    // Overlay for interaction
-    const bisect = d3.bisector<number, number>((_, i) => i).center;
-    svg
-      .append('rect')
-      .attr('width', width)
-      .attr('height', height)
+    g.append('circle')
+      .attr('cx', lastX)
+      .attr('cy', lastY)
+      .attr('r', 3.5)
+      .attr('fill', '#ffffff')
+      .attr('stroke', color)
+      .attr('stroke-width', 2);
+
+    // Interactive hover overlay
+    const overlay = g.append('rect')
+      .attr('width', innerWidth)
+      .attr('height', innerHeight)
       .attr('fill', 'transparent')
-      .attr('cursor', 'crosshair')
-      .on('mousemove', (event) => {
-        const [mx] = d3.pointer(event);
-        const relX = mx - margin.left;
-        const index = bisect(data, xScale.invert(relX));
-        if (index >= 0 && index < data.length) {
-          setHoverVal(data[index]);
-        }
-      })
-      .on('mouseleave', () => {
-        setHoverVal(null);
-      });
-  }, [data, height, color]);
+      .attr('cursor', 'crosshair');
+
+    overlay.on('mousemove', (event) => {
+      const [mx] = d3.pointer(event);
+      const index = Math.round(xScale.invert(mx));
+      if (index >= 0 && index < data.length) {
+        setHoverVal(data[index]);
+      }
+    });
+
+    overlay.on('mouseleave', () => {
+      setHoverVal(null);
+    });
+  }, [data, height, color, sparkWidth]);
 
   return (
-    <div className="relative w-full overflow-hidden" ref={containerRef}>
-      <svg className="w-full overflow-visible block" />
-      {hoverVal !== null && (
-        <div className="absolute top-1 right-2 bg-slate-900/90 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow pointer-events-none backdrop-blur-sm dark:bg-slate-100 dark:text-slate-900">
-          {hoverVal} ops/sec
-        </div>
-      )}
+    <div ref={containerRef} className="w-full flex flex-col justify-center overflow-hidden">
+      <div className="flex items-baseline justify-between text-[11px] mb-1">
+        <span className="text-slate-400">Throughput Velocity</span>
+        <span className="font-mono font-semibold text-slate-700 dark:text-slate-200">
+          {hoverVal !== null ? `${hoverVal} ops/sec` : `${data[data.length - 1]} ops/sec`}
+        </span>
+      </div>
+      <svg className="w-full block" />
     </div>
   );
 };

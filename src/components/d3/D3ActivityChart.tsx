@@ -26,13 +26,35 @@ export const D3ActivityChart: React.FC = () => {
   ]);
 
   const [tooltip, setTooltip] = useState<{ x: number; y: number; point: ActivityPoint } | null>(null);
+  const [chartWidth, setChartWidth] = useState<number>(600);
+
+  // Responsive Resize Observer
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setChartWidth(entry.contentRect.width);
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const width = containerRef.current.clientWidth || 600;
+    const width = chartWidth;
     const height = 240;
-    const margin = { top: 20, right: 20, bottom: 30, left: 45 };
+    const margin = {
+      top: 20,
+      right: width < 400 ? 10 : 20,
+      bottom: 30,
+      left: width < 400 ? 35 : 45,
+    };
 
     const svg = d3.select(containerRef.current).select('svg');
     svg.selectAll('*').remove();
@@ -40,10 +62,11 @@ export const D3ActivityChart: React.FC = () => {
     svg
       .attr('width', '100%')
       .attr('height', height)
-      .attr('viewBox', `0 0 ${width} ${height}`);
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'none');
 
-    const innerWidth = width - margin.left - margin.right;
-    const innerHeight = height - margin.top - margin.bottom;
+    const innerWidth = Math.max(50, width - margin.left - margin.right);
+    const innerHeight = Math.max(50, height - margin.top - margin.bottom);
 
     const g = svg
       .append('g')
@@ -61,10 +84,17 @@ export const D3ActivityChart: React.FC = () => {
       .domain([0, maxVal * 1.15])
       .range([innerHeight, 0]);
 
-    // X Axis
+    // X Axis with responsive label skip on small devices
+    const isSmall = width < 480;
+    const xAxis = d3
+      .axisBottom(x)
+      .tickSize(0)
+      .tickPadding(8)
+      .tickFormat((d, i) => (isSmall && i % 2 !== 0 ? '' : d));
+
     g.append('g')
       .attr('transform', `translate(0,${innerHeight})`)
-      .call(d3.axisBottom(x).tickSize(0).tickPadding(8))
+      .call(xAxis)
       .attr('class', 'text-slate-400 text-[10px] font-mono')
       .select('.domain')
       .attr('stroke', '#cbd5e1')
@@ -72,11 +102,11 @@ export const D3ActivityChart: React.FC = () => {
 
     // Y Axis
     g.append('g')
-      .call(d3.axisLeft(y).ticks(4).tickSize(-innerWidth).tickPadding(8))
+      .call(d3.axisLeft(y).ticks(4).tickSize(-innerWidth).tickPadding(6))
       .attr('class', 'text-slate-400 text-[10px] font-mono')
-      .call((g) => g.select('.domain').remove())
-      .call((g) =>
-        g
+      .call((gAxis) => gAxis.select('.domain').remove())
+      .call((gAxis) =>
+        gAxis
           .selectAll('.tick line')
           .attr('stroke', '#e2e8f0')
           .attr('stroke-dasharray', '2,2')
@@ -99,97 +129,155 @@ export const D3ActivityChart: React.FC = () => {
       .y1((d) => y(d.executions))
       .curve(d3.curveMonotoneX);
 
-    // Validations Area
-    g.append('path')
-      .datum(data)
-      .attr('fill', '#3b82f6')
-      .attr('fill-opacity', 0.15)
-      .attr('d', areaValidations);
+    // Line generator for validations
+    const lineValidations = d3
+      .line<ActivityPoint>()
+      .x((d) => x(d.time) || 0)
+      .y((d) => y(d.validations))
+      .curve(d3.curveMonotoneX);
 
-    // Validations Line
+    // Line generator for executions
+    const lineExecutions = d3
+      .line<ActivityPoint>()
+      .x((d) => x(d.time) || 0)
+      .y((d) => y(d.executions))
+      .curve(d3.curveMonotoneX);
+
+    // Gradients
+    const defs = svg.append('defs');
+
+    const gradVal = defs
+      .append('linearGradient')
+      .attr('id', 'grad-validations')
+      .attr('x1', '0%')
+      .attr('y1', '0%')
+      .attr('x2', '0%')
+      .attr('y2', '100%');
+    gradVal.append('stop').attr('offset', '0%').attr('stop-color', '#3b82f6').attr('stop-opacity', 0.35);
+    gradVal.append('stop').attr('offset', '100%').attr('stop-color', '#3b82f6').attr('stop-opacity', 0.0);
+
+    const gradExec = defs
+      .append('linearGradient')
+      .attr('id', 'grad-executions')
+      .attr('x1', '0%')
+      .attr('y1', '0%')
+      .attr('x2', '0%')
+      .attr('y2', '100%');
+    gradExec.append('stop').attr('offset', '0%').attr('stop-color', '#10b981').attr('stop-opacity', 0.35);
+    gradExec.append('stop').attr('offset', '100%').attr('stop-color', '#10b981').attr('stop-opacity', 0.0);
+
+    // Render areas
     g.append('path')
       .datum(data)
+      .attr('d', areaValidations)
+      .attr('fill', 'url(#grad-validations)');
+
+    g.append('path')
+      .datum(data)
+      .attr('d', areaExecutions)
+      .attr('fill', 'url(#grad-executions)');
+
+    // Render lines
+    g.append('path')
+      .datum(data)
+      .attr('d', lineValidations)
       .attr('fill', 'none')
       .attr('stroke', '#3b82f6')
-      .attr('stroke-width', 2)
-      .attr(
-        'd',
-        d3
-          .line<ActivityPoint>()
-          .x((d) => x(d.time) || 0)
-          .y((d) => y(d.validations))
-          .curve(d3.curveMonotoneX)
-      );
+      .attr('stroke-width', 2);
 
-    // Executions Line
     g.append('path')
       .datum(data)
+      .attr('d', lineExecutions)
       .attr('fill', 'none')
       .attr('stroke', '#10b981')
-      .attr('stroke-width', 2)
-      .attr(
-        'd',
-        d3
-          .line<ActivityPoint>()
-          .x((d) => x(d.time) || 0)
-          .y((d) => y(d.executions))
-          .curve(d3.curveMonotoneX)
-      );
+      .attr('stroke-width', 2);
 
-    // Interaction dots
-    data.forEach((p) => {
-      const cx = x(p.time) || 0;
-      const cy = y(p.validations);
+    // Hover overlay / interactive vertical guide
+    const focus = g.append('g').style('display', 'none');
 
-      g.append('circle')
-        .attr('cx', cx)
-        .attr('cy', cy)
-        .attr('r', 3)
-        .attr('fill', '#3b82f6')
-        .attr('stroke', '#ffffff')
-        .attr('stroke-width', 1.5)
-        .attr('class', 'cursor-pointer hover:r-5 transition-all');
-    });
+    focus
+      .append('line')
+      .attr('class', 'focus-line')
+      .attr('y1', 0)
+      .attr('y2', innerHeight)
+      .attr('stroke', '#64748b')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3,3');
 
-    // Bisector overlay
-    svg
-      .append('rect')
-      .attr('width', width)
-      .attr('height', height)
+    const dotVal = focus
+      .append('circle')
+      .attr('r', 4)
+      .attr('fill', '#3b82f6')
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 1.5);
+
+    const dotExec = focus
+      .append('circle')
+      .attr('r', 4)
+      .attr('fill', '#10b981')
+      .attr('stroke', '#ffffff')
+      .attr('stroke-width', 1.5);
+
+    g.append('rect')
+      .attr('width', innerWidth)
+      .attr('height', innerHeight)
       .attr('fill', 'transparent')
+      .on('mouseenter', () => focus.style('display', null))
+      .on('mouseleave', () => {
+        focus.style('display', 'none');
+        setTooltip(null);
+      })
       .on('mousemove', (event) => {
         const [mx] = d3.pointer(event);
-        const relX = mx - margin.left;
-        const index = Math.max(
-          0,
-          Math.min(
-            data.length - 1,
-            Math.round((relX / innerWidth) * (data.length - 1))
-          )
-        );
-        const point = data[index];
-        if (point) {
-          setTooltip({ x: mx, y: y(point.validations) + margin.top, point });
+        const eachBand = innerWidth / (data.length - 1);
+        const index = Math.round(mx / eachBand);
+        const clampedIndex = Math.max(0, Math.min(data.length - 1, index));
+        const point = data[clampedIndex];
+        const px = x(point.time) || 0;
+
+        focus.select('.focus-line').attr('transform', `translate(${px},0)`);
+        dotVal.attr('transform', `translate(${px},${y(point.validations)})`);
+        dotExec.attr('transform', `translate(${px},${y(point.executions)})`);
+
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          setTooltip({
+            x: px + margin.left,
+            y: Math.min(y(point.validations), y(point.executions)) + margin.top,
+            point,
+          });
         }
-      })
-      .on('mouseleave', () => setTooltip(null));
-  }, [data]);
+      });
+  }, [data, chartWidth]);
 
   return (
-    <div className="relative w-full" ref={containerRef}>
-      <svg className="w-full block overflow-visible" />
+    <div ref={containerRef} className="relative w-full overflow-hidden">
+      <svg className="w-full h-auto block" />
+
+      {/* Tooltip */}
       {tooltip && (
         <div
-          className="absolute z-20 pointer-events-none bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 text-xs px-2.5 py-1.5 rounded-lg shadow-xl -translate-x-1/2 -translate-y-full"
-          style={{ left: tooltip.x, top: tooltip.y - 8 }}
+          className="absolute z-10 pointer-events-none p-2.5 rounded-xl bg-slate-900/90 text-white text-xs shadow-xl border border-slate-700/80 backdrop-blur-xs transition-transform duration-75"
+          style={{
+            left: `${Math.min(tooltip.x + 10, chartWidth - 140)}px`,
+            top: `${Math.max(10, tooltip.y - 65)}px`,
+          }}
         >
-          <div className="font-semibold">{tooltip.point.time} UTC</div>
-          <div className="text-[11px] text-blue-300 dark:text-blue-600">
-            ⚡ {tooltip.point.validations} Validations/hr
+          <div className="font-bold text-[11px] text-slate-300 font-mono mb-1">{tooltip.point.time} UTC</div>
+          <div className="flex items-center gap-2 text-blue-400">
+            <span className="w-2 h-2 rounded-full bg-blue-500" />
+            <span>Validations: {tooltip.point.validations.toLocaleString()}</span>
           </div>
-          <div className="text-[11px] text-emerald-300 dark:text-emerald-600">
-            ✓ {tooltip.point.executions} Executions/hr
+          <div className="flex items-center gap-2 text-emerald-400">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Executions: {tooltip.point.executions.toLocaleString()}</span>
           </div>
+          {tooltip.point.failures > 0 && (
+            <div className="flex items-center gap-2 text-rose-400 mt-0.5">
+              <span className="w-2 h-2 rounded-full bg-rose-500" />
+              <span>Failures: {tooltip.point.failures}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

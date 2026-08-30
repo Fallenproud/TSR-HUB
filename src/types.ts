@@ -113,6 +113,7 @@ export interface SkillItem {
   complexity: 'Low' | 'Medium' | 'High';
   testPassRate: number;
   tags: string[];
+  isPinned?: boolean;
   isArchived?: boolean;
   skillMdContent?: string;
   schemaPreview?: string;

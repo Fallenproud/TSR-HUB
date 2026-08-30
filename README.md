@@ -26,12 +26,14 @@
 ## 🌟 Core Capabilities
 
 - **11 Domain Governance Pillars**: Structured catalog covering `DEFEND`, `CREATE`, `OPERATE`, `SCALE`, `OPTIMIZE`, `MONITOR`, `GOVERN`, `SECURE`, `ANALYZE`, `INTEGRATE`, and `FUND`.
-- **Interactive D3 Force Topology Engine**:
-  - Force-directed organic layout with live collision physics and link repulsion tuning.
-  - Category cluster centroid layout with real-time `d3.polygonHull` density envelopes.
-  - Concentric radial rings for centrality hub inspection.
-  - Left-to-right DAG (Directed Acyclic Graph) dependency execution ordering.
-  - Interactive lineage highlighting isolating upstream prerequisites (cyan) and downstream dependents (amber).
+- **Interactive D3 Force Topology & Taxonomy Engines**:
+  - **D3 Demand Forecast (Time-Series Area Chart)**: Projects future skills demand across 6-18 month horizons using empirical historical registry throughput, 95% confidence intervals, and scenario growth modeling (Conservative +5%, Baseline +12%, Aggressive AI +22%).
+  - **D3 Taxonomy Explorer (Radial Tree)**: Multi-level concentric hierarchical projection from root registry -> 11 domain pillars -> 35 individual skill packages with dynamic expand/collapse branches and radial cluster modes.
+  - **Force-directed Organic Layout**: Live collision physics and link repulsion tuning.
+  - **Category Cluster Centroid Layout**: Real-time `d3.polygonHull` density envelopes.
+  - **Concentric Radial Rings**: Centrality hub inspection.
+  - **Left-to-Right DAG Sequence**: Directed Acyclic Graph dependency execution ordering.
+  - **Interactive Lineage Highlighting**: Isolating upstream prerequisites (cyan) and downstream dependents (amber).
 - **Comprehensive Lifecycle Management**:
   - Full CRUD operations with modal editors, tag management, and dependency linkers.
   - Automated contract validation with JSON schema inspection.

@@ -18,6 +18,10 @@ import {
   Sparkles,
   Compass,
   FolderPlus,
+  Menu,
+  X,
+  Keyboard,
+  Mic,
 } from 'lucide-react';
 import { UserRole, SyncState, NotificationItem, SkillItem } from '../types';
 import { exportSkillsToCSV, exportSkillsToJSON, exportSkillsToMarkdown, printExecutiveReport } from '../utils/exportUtils';
@@ -35,6 +39,7 @@ interface HeaderProps {
   onOpenNewSkillModal: () => void;
   onOpenNewCategoryModal?: () => void;
   onOpenOnboarding?: () => void;
+  onOpenShortcutsHelp?: () => void;
   activeView: string;
   onSelectView: (view: string) => void;
   notifications: NotificationItem[];
@@ -44,6 +49,8 @@ interface HeaderProps {
   onSelectSkillById?: (skillId: string) => void;
   onOpenNotificationPreferences: () => void;
   onSimulateNotificationEvent: () => void;
+  onToggleMobileSidebar?: () => void;
+  isMobileSidebarOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -57,6 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewSkillModal,
   onOpenNewCategoryModal,
   onOpenOnboarding,
+  onOpenShortcutsHelp,
   onSelectView,
   notifications,
   onMarkNotificationAsRead,
@@ -65,6 +73,8 @@ export const Header: React.FC<HeaderProps> = ({
   onSelectSkillById,
   onOpenNotificationPreferences,
   onSimulateNotificationEvent,
+  onToggleMobileSidebar,
+  isMobileSidebarOpen,
 }) => {
   const [roleMenuOpen, setRoleMenuOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -100,17 +110,28 @@ export const Header: React.FC<HeaderProps> = ({
   const currentRoleInfo = roles.find((r) => r.role === currentRole) || roles[0];
 
   return (
-    <header className="sticky top-0 z-40 h-16 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-4 sm:px-6 flex items-center justify-between transition-colors">
-      {/* Left: Brand Identity */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs tracking-wider shadow-sm dark:bg-slate-100 dark:text-slate-900">
+    <header className="sticky top-0 z-40 h-16 w-full border-b border-slate-200 dark:border-slate-800 bg-white/95 dark:bg-slate-900/95 backdrop-blur px-3 sm:px-6 flex items-center justify-between transition-colors">
+      {/* Left: Hamburger (mobile) + Brand Identity */}
+      <div className="flex items-center gap-2 sm:gap-3">
+        {onToggleMobileSidebar && (
+          <button
+            onClick={onToggleMobileSidebar}
+            className="md:hidden p-2 -ml-1 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors"
+            aria-label={isMobileSidebarOpen ? 'Close Navigation Menu' : 'Open Navigation Menu'}
+            title="Toggle Navigation Menu"
+          >
+            {isMobileSidebarOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+          </button>
+        )}
+
+        <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-slate-900 text-white font-bold text-xs tracking-wider shadow-sm dark:bg-slate-100 dark:text-slate-900 shrink-0">
           TSR
         </div>
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white">
+          <span className="font-semibold text-sm sm:text-base tracking-tight text-slate-900 dark:text-white truncate">
             Technical Skills Registry
           </span>
-          <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800">
+          <span className="hidden md:inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800 shrink-0">
             v1.0.0
           </span>
         </div>
@@ -120,15 +141,20 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="hidden lg:flex items-center max-w-md w-full mx-4">
         <button
           onClick={onOpenCommandPalette}
-          className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-all text-xs"
+          className="w-full flex items-center justify-between px-3.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-950/60 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:border-slate-300 dark:hover:border-slate-700 transition-all text-xs group"
         >
           <div className="flex items-center gap-2">
-            <Search className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-500 dark:text-slate-400">Search skills, categories, files...</span>
+            <Search className="w-3.5 h-3.5 text-slate-400 group-hover:text-indigo-500" />
+            <span className="text-slate-500 dark:text-slate-400">Search or dictate skills, categories...</span>
           </div>
-          <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs">
-            ⌘K
-          </kbd>
+          <div className="flex items-center gap-1.5">
+            <span className="text-slate-400 group-hover:text-rose-500 transition-colors" title="Voice Search enabled in Command Palette">
+              <Mic className="w-3.5 h-3.5" />
+            </span>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono font-medium text-slate-500 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded shadow-xs">
+              ⌘K
+            </kbd>
+          </div>
         </button>
       </div>
 
@@ -296,6 +322,18 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Compass className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
             <span className="hidden sm:inline">Tour</span>
+          </button>
+        )}
+
+        {/* Keyboard Shortcuts Trigger Button */}
+        {onOpenShortcutsHelp && (
+          <button
+            onClick={onOpenShortcutsHelp}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs text-slate-600 dark:text-slate-300 transition-colors"
+            title="Keyboard Shortcuts Cheat Sheet (?)"
+          >
+            <Keyboard className="w-3.5 h-3.5 text-indigo-500" />
+            <kbd className="hidden sm:inline-flex text-[10px] font-mono font-semibold text-slate-400">?</kbd>
           </button>
         )}
 

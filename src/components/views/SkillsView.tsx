@@ -20,6 +20,7 @@ import {
   Edit3,
   ExternalLink,
   Code2,
+  Star,
 } from 'lucide-react';
 import { SkillItem, CategoryId, UserRole, CategoryInfo, SkillStatus } from '../../types';
 import { CATEGORIES_DATA, CATEGORY_LIST } from '../../data/categoriesData';
@@ -27,6 +28,7 @@ import { exportSkillsToCSV, exportSkillsToJSON } from '../../utils/exportUtils';
 import { SkillDetailCard } from '../SkillDetailCard';
 import { BulkActionToolbar } from '../BulkActionToolbar';
 import { QuickEditSlideOut } from '../QuickEditSlideOut';
+import { VoiceInputButton } from '../common/VoiceInputButton';
 
 interface SkillsViewProps {
   skills: SkillItem[];
@@ -44,6 +46,8 @@ interface SkillsViewProps {
   onBatchDeleteSkills?: (skillIds: string[]) => void;
   onBatchStatusSkills?: (skillIds: string[], status: SkillStatus) => void;
   onBatchVerifySkills?: (skillIds: string[]) => void;
+  onTogglePinSkill?: (skillId: string) => void;
+  pinnedSkillIds?: string[];
 }
 
 export const SkillsView: React.FC<SkillsViewProps> = ({
@@ -62,11 +66,13 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
   onBatchDeleteSkills,
   onBatchStatusSkills,
   onBatchVerifySkills,
+  onTogglePinSkill,
+  pinnedSkillIds = [],
 }) => {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<CategoryId | 'ALL'>('ALL');
   const [complexityFilter, setComplexityFilter] = useState<'ALL' | 'Low' | 'Medium' | 'High'>('ALL');
-  const [archiveFilter, setArchiveFilter] = useState<'active' | 'all' | 'archived'>('active');
+  const [archiveFilter, setArchiveFilter] = useState<'active' | 'all' | 'pinned' | 'archived'>('active');
   const [sortBy, setSortBy] = useState<'number' | 'name' | 'complexity' | 'testPassRate'>('number');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
@@ -78,6 +84,9 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
   // Full detailed inspector state
   const [fullInspectorSkill, setFullInspectorSkill] = useState<SkillItem | null>(selectedSkill);
 
+  const pinnedCount = skills.filter((s) => s.isPinned || pinnedSkillIds.includes(s.id)).length;
+  const archivedCount = skills.filter((s) => s.isArchived).length;
+
   const filteredSkills = skills
     .filter((s) => {
       const matchSearch =
@@ -88,10 +97,12 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
       const matchCat = categoryFilter === 'ALL' || s.category === categoryFilter;
       const matchComp = complexityFilter === 'ALL' || s.complexity === complexityFilter;
       
-      // Archive filter
+      // Archive & Pinned filter
       let matchArchive = true;
       if (archiveFilter === 'active') {
         matchArchive = !s.isArchived;
+      } else if (archiveFilter === 'pinned') {
+        matchArchive = !s.isArchived && (!!s.isPinned || pinnedSkillIds.includes(s.id));
       } else if (archiveFilter === 'archived') {
         matchArchive = !!s.isArchived;
       }
@@ -205,8 +216,6 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
     exportSkillsToJSON(selectedSkills);
   };
 
-  const archivedCount = skills.filter((s) => s.isArchived).length;
-
   return (
     <div className="space-y-6">
       {/* Header Bar */}
@@ -269,15 +278,23 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
       {/* Filter and Search Controls */}
       <div className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-3">
         <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-          <div className="sm:col-span-5 relative">
+          <div className="sm:col-span-5 relative flex items-center">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search by name, number, tag (e.g. #zero-trust, #ai-ready)..."
+              placeholder="Search or dictate name, #tag, or number..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
+              className="w-full pl-9 pr-10 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             />
+            <div className="absolute right-1.5 top-1/2 -translate-y-1/2">
+              <VoiceInputButton
+                size="sm"
+                mode="replace"
+                title="Voice search skills"
+                onTranscript={(spoken) => setSearch(spoken)}
+              />
+            </div>
           </div>
 
           <div className="sm:col-span-3">
@@ -311,10 +328,11 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
           <div className="sm:col-span-2">
             <select
               value={archiveFilter}
-              onChange={(e) => setArchiveFilter(e.target.value as 'active' | 'all' | 'archived')}
+              onChange={(e) => setArchiveFilter(e.target.value as 'active' | 'all' | 'pinned' | 'archived')}
               className="w-full px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-xs text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-indigo-500"
             >
               <option value="active">Active Skills ({skills.length - archivedCount})</option>
+              <option value="pinned">★ Pinned ({pinnedCount})</option>
               <option value="all">All (incl. Archived) ({skills.length})</option>
               <option value="archived">Archived Only ({archivedCount})</option>
             </select>
@@ -391,6 +409,8 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
             currentRole={currentRole}
             onUpdateTags={onUpdateSkillTags}
             onEndorseSkill={onEndorseSkill}
+            onTogglePinSkill={onTogglePinSkill}
+            isPinned={fullInspectorSkill.isPinned || pinnedSkillIds.includes(fullInspectorSkill.id)}
           />
         </div>
       )}
@@ -420,6 +440,7 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
           };
           const isInspected = (fullInspectorSkill?.id === skill.id) || (quickEditSkill?.id === skill.id);
           const isChecked = selectedSkillIds.includes(skill.id);
+          const isPinned = skill.isPinned || pinnedSkillIds.includes(skill.id);
 
           return (
             <div
@@ -437,12 +458,12 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
             >
               <div>
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
                     {/* Checkbox for batch multi-select */}
                     <button
                       type="button"
                       onClick={(e) => handleToggleSelectSkill(skill.id, e)}
-                      className="p-1 -m-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                      className="p-1 -m-1 rounded-md text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors shrink-0"
                       title={isChecked ? 'Unselect skill' : 'Select skill for bulk actions'}
                     >
                       {isChecked ? (
@@ -452,15 +473,38 @@ export const SkillsView: React.FC<SkillsViewProps> = ({
                       )}
                     </button>
 
-                    <span className="font-mono text-sm font-bold text-slate-400">
+                    <span className="font-mono text-sm font-bold text-slate-400 shrink-0">
                       {skill.number}
                     </span>
-                    <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
                       {skill.name}
                     </h3>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {onTogglePinSkill && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onTogglePinSkill(skill.id);
+                        }}
+                        className={`p-1 rounded-md transition-all ${
+                          isPinned
+                            ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/60'
+                            : 'text-slate-300 dark:text-slate-600 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 opacity-60 group-hover:opacity-100'
+                        }`}
+                        title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
+                        aria-label={isPinned ? `Unpin ${skill.name}` : `Pin ${skill.name}`}
+                      >
+                        <Star
+                          className={`w-3.5 h-3.5 ${
+                            isPinned ? 'fill-amber-500 text-amber-500' : ''
+                          }`}
+                        />
+                      </button>
+                    )}
+
                     {skill.isArchived && (
                       <span className="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-slate-200 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-300 dark:border-slate-700">
                         Archived

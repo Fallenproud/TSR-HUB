@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { CATEGORY_LIST } from '../../data/categoriesData';
 
@@ -7,7 +7,26 @@ interface D3RadarChartProps {
 }
 
 export const D3RadarChart: React.FC<D3RadarChartProps> = ({ size = 320 }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(size);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          // Keep chart bounded to available width or size prop
+          const calculatedWidth = Math.min(entry.contentRect.width, size);
+          setContainerWidth(Math.max(240, calculatedWidth));
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, [size]);
 
   useEffect(() => {
     if (!svgRef.current) return;
@@ -15,11 +34,18 @@ export const D3RadarChart: React.FC<D3RadarChartProps> = ({ size = 320 }) => {
     const svg = d3.select(svgRef.current);
     svg.selectAll('*').remove();
 
-    const width = size;
-    const height = size;
-    const radius = Math.min(width, height) / 2 - 40;
+    const chartSize = Math.max(240, containerWidth);
+    const width = chartSize;
+    const height = chartSize;
+    const radius = Math.min(width, height) / 2 - 36;
     const numAxes = CATEGORY_LIST.length;
     const angleSlice = (Math.PI * 2) / numAxes;
+
+    svg
+      .attr('width', '100%')
+      .attr('height', chartSize)
+      .attr('viewBox', `0 0 ${width} ${height}`)
+      .attr('preserveAspectRatio', 'xMidYMid meet');
 
     const g = svg
       .append('g')
@@ -61,12 +87,12 @@ export const D3RadarChart: React.FC<D3RadarChartProps> = ({ size = 320 }) => {
     // Axis labels
     axes
       .append('text')
-      .attr('class', 'legend fill-slate-600 dark:fill-slate-400 font-semibold text-[9px] uppercase')
+      .attr('class', 'legend fill-slate-600 dark:fill-slate-400 font-semibold text-[8px] sm:text-[9px] uppercase')
       .attr('text-anchor', 'middle')
       .attr('dy', '0.35em')
-      .attr('x', (_, i) => (rScale(100) + 18) * Math.cos(angleSlice * i - Math.PI / 2))
-      .attr('y', (_, i) => (rScale(100) + 18) * Math.sin(angleSlice * i - Math.PI / 2))
-      .text((d) => d.id.replace('_', ' '));
+      .attr('x', (_, i) => (rScale(100) + 16) * Math.cos(angleSlice * i - Math.PI / 2))
+      .attr('y', (_, i) => (rScale(100) + 16) * Math.sin(angleSlice * i - Math.PI / 2))
+      .text((d) => (chartSize < 280 ? d.id.substring(0, 3) : d.id.replace('_', ' ')));
 
     // Synthetic Data: Maturity Score (80-100) and Automated Coverage (90-100)
     const maturityData = CATEGORY_LIST.map((c, i) => ({
@@ -100,11 +126,11 @@ export const D3RadarChart: React.FC<D3RadarChartProps> = ({ size = 320 }) => {
       .attr('fill', '#2563eb')
       .attr('stroke', '#ffffff')
       .attr('stroke-width', 1.5);
-  }, [size]);
+  }, [containerWidth, size]);
 
   return (
-    <div className="flex flex-col items-center justify-center p-2">
-      <svg ref={svgRef} width={size} height={size} className="overflow-visible" />
+    <div ref={containerRef} className="w-full flex flex-col items-center justify-center p-2 overflow-hidden">
+      <svg ref={svgRef} className="overflow-visible max-w-full h-auto" />
     </div>
   );
 };

@@ -15,6 +15,7 @@ import {
   FlaskConical,
   BarChart2,
   RotateCcw,
+  Star,
 } from 'lucide-react';
 import { SkillItem, CategoryId } from '../types';
 import { CATEGORIES_DATA } from '../data/categoriesData';
@@ -27,6 +28,8 @@ interface SkillsGridProps {
   onSelectCategoryFilter: (cat: CategoryId | 'ALL') => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onTogglePinSkill?: (skillId: string) => void;
+  pinnedSkillIds?: string[];
 }
 
 export const SkillsGrid: React.FC<SkillsGridProps> = ({
@@ -37,6 +40,8 @@ export const SkillsGrid: React.FC<SkillsGridProps> = ({
   onSelectCategoryFilter,
   searchQuery,
   onSearchChange,
+  onTogglePinSkill,
+  pinnedSkillIds = [],
 }) => {
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
@@ -104,6 +109,7 @@ export const SkillsGrid: React.FC<SkillsGridProps> = ({
           {skills.map((skill) => {
             const isSelected = selectedSkillId === skill.id;
             const cat = CATEGORIES_DATA[skill.category];
+            const isPinned = skill.isPinned || pinnedSkillIds.includes(skill.id);
 
             return (
               <div
@@ -116,24 +122,49 @@ export const SkillsGrid: React.FC<SkillsGridProps> = ({
                 }`}
               >
                 <div>
-                  {/* Top line: Number + Title + Category Pill */}
+                  {/* Top line: Number + Title + Star + Category Pill */}
                   <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-xs font-mono font-bold text-slate-400 dark:text-slate-500 shrink-0">
                         {skill.number}
                       </span>
-                      <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                      <h3 className="text-xs font-bold text-slate-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors truncate">
                         {skill.name}
                       </h3>
                     </div>
 
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight uppercase shrink-0 border ${
-                        cat?.badgeColor || 'bg-slate-100'
-                      }`}
-                    >
-                      {skill.category}
-                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {onTogglePinSkill && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTogglePinSkill(skill.id);
+                          }}
+                          className={`p-1 rounded-md transition-all ${
+                            isPinned
+                              ? 'text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-950/60'
+                              : 'text-slate-300 dark:text-slate-600 hover:text-amber-500 dark:hover:text-amber-400 hover:bg-slate-100 dark:hover:bg-slate-800 opacity-60 group-hover:opacity-100'
+                          }`}
+                          title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
+                          aria-label={isPinned ? `Unpin ${skill.name}` : `Pin ${skill.name}`}
+                        >
+                          <Star
+                            className={`w-3.5 h-3.5 ${
+                              isPinned ? 'fill-amber-500 text-amber-500' : ''
+                            }`}
+                          />
+                        </button>
+                      )}
+
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold tracking-tight uppercase shrink-0 border ${
+                          cat?.badgeColor || 'bg-slate-100'
+                        }`}
+                      >
+                        {skill.category}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Description */}
@@ -197,6 +228,7 @@ export const SkillsGrid: React.FC<SkillsGridProps> = ({
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-50 dark:bg-slate-950/60 border-b border-slate-200 dark:border-slate-800 text-[10px] uppercase font-bold text-slate-400">
               <tr>
+                <th className="py-2.5 px-3 w-8">★</th>
                 <th className="py-2.5 px-3">#</th>
                 <th className="py-2.5 px-3">Skill Name</th>
                 <th className="py-2.5 px-3">Category</th>
@@ -207,41 +239,67 @@ export const SkillsGrid: React.FC<SkillsGridProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-medium">
-              {skills.map((skill) => (
-                <tr
-                  key={skill.id}
-                  onClick={() => onSelectSkill(skill)}
-                  className={`hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors ${
-                    selectedSkillId === skill.id ? 'bg-indigo-50/70 dark:bg-indigo-950/40' : ''
-                  }`}
-                >
-                  <td className="py-2.5 px-3 font-mono text-slate-400">{skill.number}</td>
-                  <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
-                    {skill.name}
-                  </td>
-                  <td className="py-2.5 px-3">
-                    <span
-                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
-                        CATEGORIES_DATA[skill.category]?.badgeColor
-                      }`}
-                    >
-                      {skill.category}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{skill.complexity}</td>
-                  <td className="py-2.5 px-3">
-                    <span className="text-emerald-600 dark:text-emerald-400 font-mono">
-                      {skill.testPassRate}%
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{skill.maintainer}</td>
-                  <td className="py-2.5 px-3 text-right">
-                    <button className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-[11px]">
-                      Inspect
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {skills.map((skill) => {
+                const isPinned = skill.isPinned || pinnedSkillIds.includes(skill.id);
+                return (
+                  <tr
+                    key={skill.id}
+                    onClick={() => onSelectSkill(skill)}
+                    className={`hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer transition-colors ${
+                      selectedSkillId === skill.id ? 'bg-indigo-50/70 dark:bg-indigo-950/40' : ''
+                    }`}
+                  >
+                    <td className="py-2.5 px-3">
+                      {onTogglePinSkill && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onTogglePinSkill(skill.id);
+                          }}
+                          className={`p-1 rounded transition-colors ${
+                            isPinned
+                              ? 'text-amber-500'
+                              : 'text-slate-300 dark:text-slate-600 hover:text-amber-500'
+                          }`}
+                          title={isPinned ? 'Unpin from sidebar' : 'Pin to sidebar'}
+                        >
+                          <Star
+                            className={`w-3.5 h-3.5 ${
+                              isPinned ? 'fill-amber-500 text-amber-500' : ''
+                            }`}
+                          />
+                        </button>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-3 font-mono text-slate-400">{skill.number}</td>
+                    <td className="py-2.5 px-3 font-semibold text-slate-900 dark:text-white">
+                      {skill.name}
+                    </td>
+                    <td className="py-2.5 px-3">
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase border ${
+                          CATEGORIES_DATA[skill.category]?.badgeColor
+                        }`}
+                      >
+                        {skill.category}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-600 dark:text-slate-400">{skill.complexity}</td>
+                    <td className="py-2.5 px-3">
+                      <span className="text-emerald-600 dark:text-emerald-400 font-mono">
+                        {skill.testPassRate}%
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3 text-slate-500 dark:text-slate-400">{skill.maintainer}</td>
+                    <td className="py-2.5 px-3 text-right">
+                      <button className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold text-[11px]">
+                        Inspect
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

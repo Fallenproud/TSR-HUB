@@ -13,10 +13,14 @@ import {
   Compass,
   GitCommit,
   CheckCircle2,
+  FolderTree,
+  LineChart,
 } from 'lucide-react';
 import { D3TopologyGraph } from '../d3/D3TopologyGraph';
 import { D3RadarChart } from '../d3/D3RadarChart';
 import { D3ActivityChart } from '../d3/D3ActivityChart';
+import { D3TaxonomyRadialTree } from '../d3/D3TaxonomyRadialTree';
+import { D3DemandForecastChart } from '../d3/D3DemandForecastChart';
 import { CATEGORY_LIST } from '../../data/categoriesData';
 import { CategoryId, SkillItem, CategoryInfo } from '../../types';
 import { exportSkillsToCSV } from '../../utils/exportUtils';
@@ -36,7 +40,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
   selectedSkillId,
 }) => {
   const [networkCatFilter, setNetworkCatFilter] = useState<CategoryId | 'ALL'>('ALL');
-  const [activeTab, setActiveTab] = useState<'network' | 'radar' | 'activity'>('network');
+  const [activeTab, setActiveTab] = useState<'network' | 'taxonomy' | 'forecast' | 'radar' | 'activity'>('network');
 
   // Compute Live Topology Graph Statistics
   const { totalLinks, crossGuildLinks, avgDegree, densityScore } = useMemo(() => {
@@ -159,7 +163,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'network'
                   ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               <Network className="w-4 h-4" />
@@ -167,11 +171,35 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('taxonomy')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'taxonomy'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <FolderTree className="w-4 h-4" />
+              <span>Taxonomy Explorer (Radial Tree)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('forecast')}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                activeTab === 'forecast'
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              <LineChart className="w-4 h-4" />
+              <span>Demand Forecast (Time-Series)</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('radar')}
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'radar'
                   ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               <Radar className="w-4 h-4" />
@@ -183,7 +211,7 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
               className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
                 activeTab === 'activity'
                   ? 'bg-indigo-600 text-white shadow-md'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
               }`}
             >
               <Activity className="w-4 h-4" />
@@ -223,7 +251,26 @@ export const InsightsView: React.FC<InsightsViewProps> = ({
           </div>
         )}
 
-        {/* Tab 2: D3 Category Radar */}
+        {/* Tab 2: Taxonomy Explorer (D3 Radial Tree) */}
+        {activeTab === 'taxonomy' && (
+          <div className="animate-in fade-in duration-200">
+            <D3TaxonomyRadialTree
+              skills={skills}
+              categories={categories}
+              selectedSkillId={selectedSkillId}
+              onSelectSkill={onSelectSkill}
+            />
+          </div>
+        )}
+
+        {/* Tab 3: Demand Forecast (D3 Time-Series Area Chart) */}
+        {activeTab === 'forecast' && (
+          <div className="animate-in fade-in duration-200">
+            <D3DemandForecastChart skills={skills} />
+          </div>
+        )}
+
+        {/* Tab 4: D3 Category Radar */}
         {activeTab === 'radar' && (
           <div className="p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm animate-in fade-in duration-200">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
